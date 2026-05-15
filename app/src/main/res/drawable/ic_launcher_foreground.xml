@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Shield Outline -->
+    <path
+        android:pathData="M54,15 C40,15 28,20 22,25 C22,50 35,75 54,90 C73,75 86,50 86,25 C80,20 68,15 54,15 Z"
+        android:strokeColor="#2563EB"
+        android:strokeWidth="4"
+        android:fillColor="#00000000" />
+
+    <!-- Road -->
+    <path
+        android:pathData="M35,60 Q54,40 73,60"
+        android:strokeColor="#1E40AF"
+        android:strokeWidth="8"
+        android:strokeLineCap="round" />
+
+    <!-- Simplified Bus -->
+    <path
+        android:pathData="M44,45 L64,45 L64,55 L44,55 Z"
+        android:fillColor="#FACC15" />
+    <path
+        android:pathData="M46,47 L52,47 L52,50 L46,50 Z"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M56,47 L62,47 L62,50 L56,50 Z"
+        android:fillColor="#FFFFFF" />
+</vector>
