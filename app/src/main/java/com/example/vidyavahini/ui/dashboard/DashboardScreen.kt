@@ -1,23 +1,21 @@
 package com.example.vidyavahini.ui.dashboard
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.res.painterResource
-import com.example.vidyavahini.R
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -27,7 +25,83 @@ import com.example.vidyavahini.viewmodel.DashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun DashboardTopAppBar(
+    userName: String,
+    onLogoutClick: () -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    TopAppBar(
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background
+        ),
+        title = {
+            Text(
+                text = "Vidya-Vahini",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                ),
+                color = MaterialTheme.colorScheme.primary
+            )
+        },
+        actions = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(end = 8.dp)
+            ) {
+                // User Name displayed to the left of the profile icon
+                Text(
+                    text = userName,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+
+                // Interactive Profile Action Button
+                Box {
+                    IconButton(onClick = { showMenu = !showMenu }) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "User Profile Menu",
+                            modifier = Modifier.size(32.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    // Professional Profile Dropdown Menu
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.clip(MaterialTheme.shapes.medium)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Log Out") },
+                            onClick = {
+                                showMenu = false
+                                onLogoutClick()
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun DashboardScreen(
+    userName: String,
     userRole: UserRole,
     onRouteClick: (String) -> Unit,
     onAddClick: () -> Unit,
@@ -35,7 +109,6 @@ fun DashboardScreen(
     onSignOut: () -> Unit,
     viewModel: DashboardViewModel = viewModel()
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val routes = viewModel.filteredRoutes
     var showMenu by remember { mutableStateOf(false) }
     var routeToDelete by remember { mutableStateOf<BusRoute?>(null) }
@@ -65,88 +138,25 @@ fun DashboardScreen(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
-                title = {
-                    val collapsedFraction = scrollBehavior.state.collapsedFraction
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        if (collapsedFraction < 0.5f) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                                contentDescription = "App Logo",
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .padding(end = 12.dp)
-                                    .graphicsLayer {
-                                        alpha = (1f - collapsedFraction * 2.5f).coerceIn(0f, 1f)
-                                    }
-                            )
-                        }
-                        Column {
-                            if (collapsedFraction < 0.5f) {
-                                Text(
-                                    text = "Vidya-Vahini",
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.graphicsLayer {
-                                        alpha = (1f - collapsedFraction * 2.5f).coerceIn(0f, 1f)
-                                    }
-                                )
-                                Text(
-                                    text = if (userRole == UserRole.ADMIN) "logged in as admin" else "user",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    fontWeight = FontWeight.Normal,
-                                    modifier = Modifier.graphicsLayer {
-                                        alpha = (1f - collapsedFraction * 2.5f).coerceIn(0f, 1f)
-                                    }
-                                )
-                            }
-                            Text(
-                                "Bus Routes",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 32.sp
-                            )
-                        }
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    IconButton(onClick = onSignOut) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ExitToApp,
-                            contentDescription = "Logout",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                )
+            DashboardTopAppBar(
+                userName = userName,
+                onLogoutClick = onSignOut
             )
         },
         floatingActionButton = {
             Box {
                 FloatingActionButton(
                     onClick = { showMenu = true },
-                    shape = RoundedCornerShape(16.dp),
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .bouncyClickable { showMenu = true }
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ) {
                     Icon(Icons.Default.Menu, contentDescription = "Menu")
                 }
                 
                 DropdownMenu(
                     expanded = showMenu,
-                    onDismissRequest = { showMenu = false },
-                    modifier = Modifier.background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                    onDismissRequest = { showMenu = false }
                 ) {
                     DropdownMenuItem(
                         text = { Text("Request New Bus") },
@@ -176,18 +186,26 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            OneUISearchBar(
-                query = viewModel.searchQuery,
-                onQueryChange = { viewModel.searchQuery = it },
-                modifier = Modifier.padding(bottom = 16.dp)
+            OutlinedTextField(
+                value = viewModel.searchQuery,
+                onValueChange = { viewModel.searchQuery = it },
+                placeholder = { Text("Search routes...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true
             )
 
             if (routes.isEmpty()) {
-                EmptyState()
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    EmptyState()
+                }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 80.dp)
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
                     items(routes) { route ->
                         BusRouteCard(

@@ -41,6 +41,11 @@ android {
 }
 
 dependencies {
+    // Credential Manager dependency for modern Google Sign-In
+    implementation("com.google.firebase:firebase-auth-ktx:23.0.0")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

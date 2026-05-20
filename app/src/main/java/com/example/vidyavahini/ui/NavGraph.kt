@@ -42,6 +42,7 @@ fun VidyaVahiniNavGraph(authViewModel: AuthViewModel) {
         }
         composable("dashboard") {
             DashboardScreen(
+                userName = authViewModel.userName,
                 userRole = authViewModel.userRole,
                 onRouteClick = { routeId ->
                     navController.navigate("transport/$routeId")

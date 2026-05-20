@@ -1,60 +1,89 @@
 package com.example.vidyavahini.ui.auth
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.vidyavahini.viewmodel.AuthState
 import com.example.vidyavahini.viewmodel.AuthViewModel
 
 @Composable
 fun MainAuthScreen(viewModel: AuthViewModel) {
+    val authState by viewModel.authState.collectAsState()
+    val context = LocalContext.current
     var isAdminLogin by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(modifier = Modifier.height(48.dp))
-        
-        Text(
-            text = "Vidya-Vahini",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = "Rural Student Transit Tracker",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.secondary
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        TabRow(selectedTabIndex = if (isAdminLogin) 1 else 0) {
-            Tab(
-                selected = !isAdminLogin,
-                onClick = { isAdminLogin = false },
-                text = { Text("Student") }
+    Scaffold { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // App Logo Placeholder
+            Icon(
+                imageVector = Icons.Default.DirectionsBus,
+                contentDescription = "App Logo",
+                modifier = Modifier.size(80.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
-            Tab(
-                selected = isAdminLogin,
-                onClick = { isAdminLogin = true },
-                text = { Text("Admin") }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Text(
+                text = "Vidya-Vahini",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
             )
-        }
+            
+            Text(
+                text = "Secure Rural Student Transit Tracker",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.secondary,
+                textAlign = TextAlign.Center
+            )
 
-        Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(48.dp))
 
-        if (isAdminLogin) {
-            EmailAuthComponent(viewModel)
-        } else {
-            PhoneAuthComponent(viewModel)
+            if (authState is AuthState.Loading) {
+                CircularProgressIndicator()
+            } else {
+                GoogleSignInButton(
+                    onClick = { viewModel.signInWithGoogle(context) },
+                    isLoading = authState is AuthState.Loading
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                TextButton(onClick = { isAdminLogin = !isAdminLogin }) {
+                    Text(if (isAdminLogin) "Back to Student Login" else "Staff/Admin Login")
+                }
+
+                if (isAdminLogin) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    EmailAuthComponent(viewModel)
+                }
+            }
+
+            if (authState is AuthState.Error) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = (authState as AuthState.Error).message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
