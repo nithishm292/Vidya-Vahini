@@ -41,6 +41,7 @@ android {
 }
 
 dependencies {
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // Credential Manager dependency for modern Google Sign-In
     implementation("com.google.firebase:firebase-auth-ktx:23.0.0")
     implementation("androidx.credentials:credentials:1.6.0")

@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
@@ -21,15 +22,20 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.vidyavahini.model.BusRoute
 import com.example.vidyavahini.model.UserRole
+import com.example.vidyavahini.utils.AppLanguage
+import com.example.vidyavahini.utils.AppStrings
+import com.example.vidyavahini.utils.LocalAppLanguage
 import com.example.vidyavahini.viewmodel.DashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardTopAppBar(
     userName: String,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onLanguageChange: (AppLanguage) -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val currentLanguage = LocalAppLanguage.current
 
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
@@ -37,7 +43,7 @@ fun DashboardTopAppBar(
         ),
         title = {
             Text(
-                text = "Vidya-Vahini",
+                text = AppStrings.appTitle(currentLanguage),
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.5.sp
@@ -50,7 +56,27 @@ fun DashboardTopAppBar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(end = 8.dp)
             ) {
-                // User Name displayed to the left of the profile icon
+                // Language Toggle
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(end = 16.dp)
+                ) {
+                    Text(
+                        text = if (currentLanguage == AppLanguage.ENGLISH) "EN" else "KN",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
+                    Switch(
+                        checked = currentLanguage == AppLanguage.KANNADA,
+                        onCheckedChange = { isChecked ->
+                            onLanguageChange(if (isChecked) AppLanguage.KANNADA else AppLanguage.ENGLISH)
+                        },
+                        modifier = Modifier.scale(0.7f)
+                    )
+                }
+
+                // User Name
                 Text(
                     text = userName,
                     style = MaterialTheme.typography.bodyMedium.copy(
@@ -78,7 +104,7 @@ fun DashboardTopAppBar(
                         modifier = Modifier.clip(MaterialTheme.shapes.medium)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Log Out") },
+                            text = { Text(AppStrings.logOut(currentLanguage)) },
                             onClick = {
                                 showMenu = false
                                 onLogoutClick()
@@ -103,6 +129,7 @@ fun DashboardTopAppBar(
 fun DashboardScreen(
     userName: String,
     userRole: UserRole,
+    onLanguageChange: (AppLanguage) -> Unit,
     onRouteClick: (String) -> Unit,
     onAddClick: () -> Unit,
     onViewRequestsClick: () -> Unit,
@@ -112,12 +139,13 @@ fun DashboardScreen(
     val routes = viewModel.filteredRoutes
     var showMenu by remember { mutableStateOf(false) }
     var routeToDelete by remember { mutableStateOf<BusRoute?>(null) }
+    val currentLanguage = LocalAppLanguage.current
 
     if (routeToDelete != null) {
         AlertDialog(
             onDismissRequest = { routeToDelete = null },
-            title = { Text("Delete Route") },
-            text = { Text("Are you sure you want to delete Bus ${routeToDelete?.number}?") },
+            title = { Text(AppStrings.deleteRoute(currentLanguage)) },
+            text = { Text(AppStrings.deleteConfirm(currentLanguage, routeToDelete?.number ?: "")) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -126,12 +154,12 @@ fun DashboardScreen(
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
                 ) {
-                    Text("Delete")
+                    Text(AppStrings.delete(currentLanguage))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { routeToDelete = null }) {
-                    Text("Cancel")
+                    Text(AppStrings.cancel(currentLanguage))
                 }
             }
         )
@@ -141,7 +169,8 @@ fun DashboardScreen(
         topBar = {
             DashboardTopAppBar(
                 userName = userName,
-                onLogoutClick = onSignOut
+                onLogoutClick = onSignOut,
+                onLanguageChange = onLanguageChange
             )
         },
         floatingActionButton = {
@@ -159,7 +188,7 @@ fun DashboardScreen(
                     onDismissRequest = { showMenu = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Request New Bus") },
+                        text = { Text(AppStrings.requestNewBus(currentLanguage)) },
                         onClick = {
                             showMenu = false
                             onAddClick()
@@ -169,7 +198,7 @@ fun DashboardScreen(
                     
                     if (userRole == UserRole.ADMIN) {
                         DropdownMenuItem(
-                            text = { Text("View Requests") },
+                            text = { Text(AppStrings.viewRequests(currentLanguage)) },
                             onClick = {
                                 showMenu = false
                                 onViewRequestsClick()
@@ -189,7 +218,7 @@ fun DashboardScreen(
             OutlinedTextField(
                 value = viewModel.searchQuery,
                 onValueChange = { viewModel.searchQuery = it },
-                placeholder = { Text("Search routes...") },
+                placeholder = { Text(AppStrings.searchPlaceholder(currentLanguage)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 modifier = Modifier
                     .fillMaxWidth()

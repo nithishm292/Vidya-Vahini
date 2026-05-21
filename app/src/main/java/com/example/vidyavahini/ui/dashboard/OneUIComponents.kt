@@ -1,5 +1,10 @@
 package com.example.vidyavahini.ui.dashboard
 
+import android.content.ContentValues
+import android.net.Uri
+import android.provider.MediaStore
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -8,7 +13,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,15 +25,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.vidyavahini.data.repository.DiscordStorageRepository
 import com.example.vidyavahini.model.BusRoute
+import com.example.vidyavahini.utils.AppLanguage
+import com.example.vidyavahini.utils.AppStrings
+import com.example.vidyavahini.utils.LocalAppLanguage
+import com.example.vidyavahini.utils.TranslatorManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun LiveStatusTicker(lastPingTimestamp: Long) {
     var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val currentLanguage = LocalAppLanguage.current
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -39,8 +54,8 @@ fun LiveStatusTicker(lastPingTimestamp: Long) {
     val diffMinutes = diffSeconds / 60
 
     val (color, text) = when {
-        diffMinutes >= 10 -> Color.Gray to "Status Stale"
-        else -> Color(0xFF4CAF50) to formatTickerTime(diffSeconds) // Green
+        diffMinutes >= 10 -> Color.Gray to AppStrings.statusStale(currentLanguage)
+        else -> Color(0xFF4CAF50) to formatTickerTime(diffSeconds, currentLanguage) // Green
     }
 
     Row(
@@ -77,41 +92,34 @@ fun LiveStatusTicker(lastPingTimestamp: Long) {
     }
 }
 
-private fun formatTickerTime(seconds: Long): String {
+private fun formatTickerTime(seconds: Long, lang: AppLanguage): String {
     return when {
-        seconds < 60 -> "Live"
-        else -> "Live ${seconds / 60}m ago"
+        seconds < 60 -> AppStrings.live(lang)
+        else -> AppStrings.minutesAgo(lang, seconds / 60)
     }
 }
 
 @Composable
 private fun LiveTickerText(text: String) {
-    val parts = text.split(" ")
-    if (parts.size >= 2 && text != "Status Stale") {
-        val timeValue = parts[0] // e.g., "5s"
-        val agoLabel = parts.subList(1, parts.size).joinToString(" ") // "ago"
-        
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = timeValue,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = agoLabel,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+    val currentLanguage = LocalAppLanguage.current
+    val isStatusStale = text == AppStrings.statusStale(currentLanguage)
+
+    if (text.contains(" ") && !isStatusStale) {
+        // Handle cases like "Live 5m ago" or "ಲೈವ್ 5ನಿಮಿಷದ ಹಿಂದೆ"
+        // This is a bit tricky with different languages, so let's just display it simply
+        // if we want complex styling we might need more logic.
+        Text(
+            text = text,
+            fontWeight = FontWeight.Medium,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     } else {
         Text(
             text = text,
             fontWeight = FontWeight.Medium,
             fontSize = 13.sp,
-            color = if (text == "Status Stale") MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface
+            color = if (isStatusStale) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -162,6 +170,21 @@ fun BusRouteCard(
     onClick: () -> Unit,
     onDeleteClick: (() -> Unit)? = null
 ) {
+    val currentLanguage = LocalAppLanguage.current
+    var translatedRoute by remember(route.from, route.to, currentLanguage) {
+        mutableStateOf("${route.from} ➔ ${route.to}")
+    }
+
+    LaunchedEffect(currentLanguage, route.from, route.to) {
+        if (currentLanguage == AppLanguage.KANNADA) {
+            val from = TranslatorManager.translateEnglishToKannada(route.from)
+            val to = TranslatorManager.translateEnglishToKannada(route.to)
+            translatedRoute = "$from ➔ $to"
+        } else {
+            translatedRoute = "${route.from} ➔ ${route.to}"
+        }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -181,7 +204,7 @@ fun BusRouteCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Bus ${route.number}",
+                        text = "${AppStrings.bus(currentLanguage)} ${route.number}",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -191,7 +214,7 @@ fun BusRouteCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (route.status == "breakdown") {
                         Text(
-                            text = "⚠️ BREAKDOWN",
+                            text = "⚠️ ${AppStrings.breakdown(currentLanguage)}",
                             fontSize = 12.sp,
                             color = Color.Red,
                             fontWeight = FontWeight.Bold,
@@ -220,7 +243,7 @@ fun BusRouteCard(
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = "${route.from} ➔ ${route.to}",
+                text = translatedRoute,
                 fontSize = 15.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -245,8 +268,15 @@ fun BusRouteCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val translatedLastSeen = remember(route.lastSeen, currentLanguage) {
+                    if (currentLanguage == AppLanguage.KANNADA) {
+                        TranslatorManager.translateEnglishToKannada(route.lastSeen)
+                    } else {
+                        route.lastSeen
+                    }
+                }
                 Text(
-                    text = "Last seen: ${route.lastSeen}",
+                    text = "${AppStrings.lastSeen(currentLanguage)}: $translatedLastSeen",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.secondary
                 )
@@ -257,8 +287,148 @@ fun BusRouteCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BusProofUploadSection(busId: String, onUrlGenerated: (String) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val discordRepository = remember { DiscordStorageRepository() }
+    var isUploading by remember { mutableStateOf(false) }
+    var showSheet by remember { mutableStateOf(false) }
+    var tempUri by remember { mutableStateOf<Uri?>(null) }
+    val sheetState = rememberModalBottomSheetState()
+    val currentLanguage = LocalAppLanguage.current
+
+    // ... (galleryLauncher and cameraLauncher stay same)
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { selectedUri ->
+            isUploading = true
+            scope.launch {
+                val permanentCdnUrl = discordRepository.uploadBusImage(context, selectedUri)
+                isUploading = false
+                
+                if (permanentCdnUrl != null) {
+                    onUrlGenerated(permanentCdnUrl.url)
+                }
+            }
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            tempUri?.let { uri ->
+                isUploading = true
+                scope.launch {
+                    val permanentCdnUrl = discordRepository.uploadBusImage(context, uri)
+                    isUploading = false
+                    
+                    if (permanentCdnUrl != null) {
+                        onUrlGenerated(permanentCdnUrl.url)
+                    }
+                }
+            }
+        }
+    }
+
+    if (showSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSheet = false },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 40.dp, start = 16.dp, end = 16.dp)
+            ) {
+                Text(
+                    text = AppStrings.addBusPhoto(currentLanguage),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(16.dp)
+                )
+                
+                Card(
+                    onClick = {
+                        scope.launch {
+                            sheetState.hide()
+                        }.invokeOnCompletion {
+                            showSheet = false
+                            val values = ContentValues().apply {
+                                put(MediaStore.Images.Media.TITLE, "Bus Photo")
+                                put(MediaStore.Images.Media.DESCRIPTION, "From Camera")
+                            }
+                            val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                            tempUri = uri
+                            if (uri != null) {
+                                cameraLauncher.launch(uri)
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text(AppStrings.openCamera(currentLanguage), style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+
+                Card(
+                    onClick = {
+                        scope.launch {
+                            sheetState.hide()
+                        }.invokeOnCompletion {
+                            showSheet = false
+                            galleryLauncher.launch("image/*")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text(AppStrings.chooseFromGallery(currentLanguage), style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Button(
+            onClick = { showSheet = true },
+            enabled = !isUploading,
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(if (isUploading) AppStrings.uploadingPhoto(currentLanguage) else AppStrings.addBusPhoto(currentLanguage))
+        }
+
+        if (isUploading) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
 @Composable
 fun EmptyState() {
+    val currentLanguage = LocalAppLanguage.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -274,7 +444,7 @@ fun EmptyState() {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "No routes found",
+            text = AppStrings.noRoutesFound(currentLanguage),
             fontSize = 18.sp,
             color = Color.Gray,
             fontWeight = FontWeight.Medium

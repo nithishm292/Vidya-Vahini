@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.vidyavahini.model.UserRole
+import com.example.vidyavahini.utils.AppLanguage
 import com.example.vidyavahini.ui.auth.MainAuthScreen
 import com.example.vidyavahini.ui.dashboard.AddBusScreen
 import com.example.vidyavahini.ui.dashboard.AdminRequestsScreen
@@ -16,7 +17,10 @@ import com.example.vidyavahini.viewmodel.AuthState
 import com.example.vidyavahini.viewmodel.AuthViewModel
 
 @Composable
-fun VidyaVahiniNavGraph(authViewModel: AuthViewModel) {
+fun VidyaVahiniNavGraph(
+    authViewModel: AuthViewModel,
+    onLanguageChange: (AppLanguage) -> Unit
+) {
     val navController = rememberNavController()
     val authState by authViewModel.authState.collectAsState()
 
@@ -44,6 +48,7 @@ fun VidyaVahiniNavGraph(authViewModel: AuthViewModel) {
             DashboardScreen(
                 userName = authViewModel.userName,
                 userRole = authViewModel.userRole,
+                onLanguageChange = onLanguageChange,
                 onRouteClick = { routeId ->
                     navController.navigate("transport/$routeId")
                 },
@@ -70,8 +75,10 @@ fun VidyaVahiniNavGraph(authViewModel: AuthViewModel) {
         }
         composable("transport/{routeId}") {
             TransportScreen(
+                userName = authViewModel.userName,
                 userRole = authViewModel.userRole,
-                onSignOut = { authViewModel.signOut() }
+                onSignOut = { authViewModel.signOut() },
+                onLanguageChange = onLanguageChange
             )
         }
     }

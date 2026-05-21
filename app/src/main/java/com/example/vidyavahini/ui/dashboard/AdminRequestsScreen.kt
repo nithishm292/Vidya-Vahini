@@ -6,8 +6,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +15,10 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import com.example.vidyavahini.data.repository.DiscordStorageRepository
 import com.example.vidyavahini.model.BusRequest
 import com.example.vidyavahini.model.BusRoute
 import com.google.firebase.Firebase
@@ -24,6 +26,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.database
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +34,8 @@ fun AdminRequestsScreen(onBack: () -> Unit) {
     var requests by remember { mutableStateOf(listOf<BusRequest>()) }
     val database = Firebase.database.getReference("bus_requests")
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val scope = rememberCoroutineScope()
+    val discordRepository = remember { DiscordStorageRepository() }
 
     LaunchedEffect(Unit) {
         database.addValueEventListener(object : ValueEventListener {
@@ -76,7 +81,14 @@ fun AdminRequestsScreen(onBack: () -> Unit) {
                     RequestCard(
                         request = request,
                         onApprove = { approveRequest(request) },
-                        onReject = { rejectRequest(request.id) }
+                        onReject = { 
+                            scope.launch {
+                                if (!request.discordMessageId.isNullOrEmpty()) {
+                                    discordRepository.deleteBusImage(request.discordMessageId)
+                                }
+                                rejectRequest(request.id) 
+                            }
+                        }
                     )
                 }
             }
@@ -98,7 +110,15 @@ fun RequestCard(request: BusRequest, onApprove: () -> Unit, onReject: () -> Unit
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Bus ${request.busNumber}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Column {
+                    Text("Bus ${request.busNumber}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = "Requested by ${request.requesterName}",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Normal
+                    )
+                }
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
                     shape = RoundedCornerShape(8.dp)
@@ -113,13 +133,26 @@ fun RequestCard(request: BusRequest, onApprove: () -> Unit, onReject: () -> Unit
                 }
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             
             Text(
                 text = "${request.from} ➔ ${request.to}",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium
             )
+            
+            if (request.imageUrl.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                AsyncImage(
+                    model = request.imageUrl,
+                    contentDescription = "Bus Proof",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp) // Adjusted to match upload size
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            }
             
             if (request.stops.isNotEmpty()) {
                 Text(
@@ -170,6 +203,7 @@ private fun approveRequest(request: BusRequest) {
         to = request.to,
         stops = request.stops,
         imageUrl = request.imageUrl,
+        discordMessageId = request.discordMessageId,
         timestamp = System.currentTimeMillis()
     )
     

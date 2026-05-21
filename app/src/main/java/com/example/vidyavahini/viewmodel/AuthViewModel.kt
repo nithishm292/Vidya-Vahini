@@ -172,9 +172,9 @@ open class AuthViewModel : ViewModel() {
 
                 // 1. Try with GetGoogleIdOption (Primary path - looks for authorized accounts)
                 val googleIdOption = GetGoogleIdOption.Builder()
-                    .setFilterByAuthorizedAccounts(true)
                     .setServerClientId(webClientId)
-                    .setAutoSelectEnabled(false)
+                    .setFilterByAuthorizedAccounts(false) // Show all accounts on the device, not just authorized ones
+                    .setAutoSelectEnabled(false)          // CRITICAL: Stop Google from auto-logging in without asking
                     .build()
 
                 val request = GetCredentialRequest.Builder()

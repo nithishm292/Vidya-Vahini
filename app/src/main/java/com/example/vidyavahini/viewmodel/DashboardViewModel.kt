@@ -2,15 +2,19 @@ package com.example.vidyavahini.viewmodel
 
 import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.vidyavahini.data.repository.DiscordStorageRepository
 import com.example.vidyavahini.model.BusRoute
 import com.google.firebase.Firebase
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.database
+import kotlinx.coroutines.launch
 
 class DashboardViewModel : ViewModel() {
     private val database = Firebase.database.getReference("routes")
+    private val discordRepository = DiscordStorageRepository()
     
     private val _allRoutes = mutableStateListOf<BusRoute>()
     var searchQuery by mutableStateOf("")
@@ -40,14 +44,23 @@ class DashboardViewModel : ViewModel() {
                 val timestamp = child.child("last_ping").getValue(Long::class.java) 
                     ?: child.child("timestamp").getValue(Long::class.java) 
                     ?: System.currentTimeMillis()
+                val imageUrl = child.child("imageUrl").getValue(String::class.java) ?: ""
+                val discordMessageId = child.child("discordMessageId").getValue(String::class.java) ?: ""
                 
                 val stops = mutableListOf<String>()
                 child.child("stops").children.forEach {
                     it.getValue(String::class.java)?.let { stop -> stops.add(stop) }
                 }
 
-                // Simplified progress logic for dashboard
-                val progress = if (status == "breakdown") 0f else 0.5f 
+                val allPoints = (listOf(from) + stops + listOf(to)).distinct()
+                val progress = when {
+                    status == "breakdown" -> 0f
+                    allPoints.size > 1 -> {
+                        val index = allPoints.indexOf(location).coerceAtLeast(0)
+                        index.toFloat() / (allPoints.size - 1)
+                    }
+                    else -> 0f
+                }
 
                 newList.add(BusRoute(
                     id = id,
@@ -58,7 +71,9 @@ class DashboardViewModel : ViewModel() {
                     lastSeen = location,
                     status = status,
                     timestamp = timestamp,
-                    stops = stops
+                    stops = stops,
+                    imageUrl = imageUrl,
+                    discordMessageId = discordMessageId
                 ))
             }
             _allRoutes.clear()
@@ -80,7 +95,15 @@ class DashboardViewModel : ViewModel() {
     }
 
     fun deleteRoute(routeId: String) {
-        database.child(routeId).removeValue()
+        database.child(routeId).get().addOnSuccessListener { snapshot ->
+            val discordMessageId = snapshot.child("discordMessageId").getValue(String::class.java)
+            viewModelScope.launch {
+                if (!discordMessageId.isNullOrEmpty()) {
+                    discordRepository.deleteBusImage(discordMessageId)
+                }
+                database.child(routeId).removeValue()
+            }
+        }
     }
 
     override fun onCleared() {

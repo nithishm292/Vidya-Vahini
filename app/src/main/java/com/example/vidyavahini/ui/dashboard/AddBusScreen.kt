@@ -1,6 +1,7 @@
 package com.example.vidyavahini.ui.dashboard
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -22,14 +23,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.vidyavahini.data.repository.DiscordStorageRepository
 import com.example.vidyavahini.model.BusRequest
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.database.database
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,7 +43,12 @@ fun AddBusScreen(onBack: () -> Unit) {
     var toStation by remember { mutableStateOf("") }
     var stops by remember { mutableStateOf(mutableStateListOf<String>()) }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
     
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val discordRepository = remember { DiscordStorageRepository() }
+
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? -> imageUri = uri }
@@ -133,14 +142,47 @@ fun AddBusScreen(onBack: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = {
-                        submitRequest(busNumber, fromStation, toStation, stops.toList(), imageUri, onBack)
+                        if (busNumber.isBlank() || fromStation.isBlank() || toStation.isBlank() || imageUri == null) {
+                            Toast.makeText(context, "Please fill all details and add a photo", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        
+                        isSubmitting = true
+                        scope.launch {
+                            try {
+                                // 1. Upload to Discord first
+                                val uploadResult = discordRepository.uploadBusImage(context, imageUri!!)
+                                
+                                if (uploadResult != null) {
+                                    val currentUser = Firebase.auth.currentUser
+                                    val requesterName = currentUser?.displayName ?: currentUser?.email?.substringBefore("@") ?: "Unknown User"
+                                    
+                                    // 2. Submit to Firebase
+                                    submitRequest(busNumber, fromStation, toStation, stops.toList(), uploadResult.url, uploadResult.messageId, requesterName) {
+                                        isSubmitting = false
+                                        onBack()
+                                    }
+                                } else {
+                                    isSubmitting = false
+                                    Toast.makeText(context, "Image upload failed. Check your internet.", Toast.LENGTH_LONG).show()
+                                }
+                            } catch (e: Exception) {
+                                isSubmitting = false
+                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
+                    enabled = !isSubmitting,
                     shape = RoundedCornerShape(28.dp)
                 ) {
-                    Text("Send Request to Admin", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    if (isSubmitting) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("Send Request to Admin", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -184,7 +226,7 @@ fun StopItem(name: String, onNameChange: (String) -> Unit, onDelete: () -> Unit)
     }
 }
 
-private fun submitRequest(number: String, from: String, to: String, stops: List<String>, imageUri: Uri?, onSuccess: () -> Unit) {
+private fun submitRequest(number: String, from: String, to: String, stops: List<String>, publicImageUrl: String, discordMessageId: String, requesterName: String, onSuccess: () -> Unit) {
     val database = Firebase.database.getReference("bus_requests")
     val id = database.push().key ?: return
     val userId = Firebase.auth.currentUser?.uid ?: "anonymous"
@@ -192,11 +234,13 @@ private fun submitRequest(number: String, from: String, to: String, stops: List<
     val request = BusRequest(
         id = id,
         requesterId = userId,
+        requesterName = requesterName,
         busNumber = number,
         from = from,
         to = to,
         stops = stops,
-        imageUrl = imageUri?.toString() ?: "",
+        imageUrl = publicImageUrl,
+        discordMessageId = discordMessageId,
         status = "pending"
     )
     
